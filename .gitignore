@@ -1,0 +1,24 @@
+# Environments
+venv/
+env/
+.env
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Data and sensitive files
+data/*.pdf
+data/*.json
+data/*.csv
+data/*.bin
+!data/.gitkeep
+
+# Ignore specifically the session and cv
+data/linkedin_session.json
+data/faiss_index.bin
+
+# IDEs
+.vscode/
+.idea/
