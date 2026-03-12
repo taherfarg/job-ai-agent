@@ -19,7 +19,8 @@ CV_PATH = DATA_DIR / "TAHER FARG CV.pdf"
 APPLIED_JOBS_CSV = DATA_DIR / "applied_jobs.csv"
 
 # Model Configurations
-LLM_MODEL = os.getenv("LLM_MODEL", "llama3:latest")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama3:latest")          # Used by Analyzer (smart/cloud)
+LLM_MODEL_FAST = os.getenv("LLM_MODEL_FAST", "llama3:latest") # Used by Finder & Applier (fast/local)
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 VECTOR_INDEX_FILE = DATA_DIR / "faiss_index.bin"
 VECTOR_DIMENSION = 384

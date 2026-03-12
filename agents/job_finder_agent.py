@@ -1,5 +1,5 @@
 from crewai import Agent, Task
-from config import LLM_MODEL
+from config import LLM_MODEL_FAST
 from json import dumps
 import logging
 
@@ -20,7 +20,7 @@ class JobFinderAgents:
             ),
             verbose=True,
             allow_delegation=False,
-            llm=f"ollama/{LLM_MODEL}",
+            llm=f"ollama/{LLM_MODEL_FAST}",
         )
 
     def create_search_task(

@@ -1,5 +1,5 @@
 from crewai import Agent, Task
-from config import LLM_MODEL
+from config import LLM_MODEL_FAST
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class ApplicationAgents:
             ),
             verbose=True,
             allow_delegation=False,
-            llm=f"ollama/{LLM_MODEL}",
+            llm=f"ollama/{LLM_MODEL_FAST}",
         )
 
     def create_apply_task(self, agent, max_applications: int):
