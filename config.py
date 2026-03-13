@@ -13,7 +13,7 @@ CV_PATH = DATA_DIR / "TAHER FARG CV.pdf"
 APPLIED_JOBS_CSV = DATA_DIR / "applied_jobs.csv"
 
 # Model Configurations
-LLM_MODEL = "qwen3.5:cloud"
+LLM_MODEL = "qwen3.5:4b"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 VECTOR_INDEX_FILE = DATA_DIR / "faiss_index.bin"
 VECTOR_DIMENSION = 384

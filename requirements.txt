@@ -1,0 +1,9 @@
+pdfplumber
+sentence-transformers
+faiss-cpu
+crewai
+playwright
+pandas
+schedule
+langchain-community
+langchain-core
