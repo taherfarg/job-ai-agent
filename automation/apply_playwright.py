@@ -14,8 +14,7 @@ from config import DATA_DIR, APPLICANT_EMAIL, APPLICANT_PHONE, CV_PATH
 
 logger = logging.getLogger(__name__)
 SESSION_FILE = DATA_DIR / "linkedin_session.json"
-RECORDINGS_DIR = DATA_DIR / "recordings"
-RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 
 # ── Site Detection ──────────────────────────────────────────────────────────
@@ -58,14 +57,9 @@ def apply_to_job(url: str, cv_path: str = str(CV_PATH)) -> bool:
                 logger.info("Found saved LinkedIn session. Injecting authenticated cookies...")
                 context = browser.new_context(
                     storage_state=SESSION_FILE,
-                    record_video_dir=str(RECORDINGS_DIR),
-                    record_video_size={"width": 1280, "height": 720},
                 )
             else:
-                context = browser.new_context(
-                    record_video_dir=str(RECORDINGS_DIR),
-                    record_video_size={"width": 1280, "height": 720},
-                )
+                context = browser.new_context()
 
             page = context.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=60000)

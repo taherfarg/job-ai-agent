@@ -20,6 +20,7 @@ APPLIED_JOBS_CSV = DATA_DIR / "applied_jobs.csv"
 
 # Model Configurations
 LLM_MODEL = "qwen3.5:cloud"
+LLM_MODEL_FAST = LLM_MODEL
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 VECTOR_INDEX_FILE = DATA_DIR / "faiss_index.bin"
 VECTOR_DIMENSION = 384
