@@ -42,7 +42,7 @@ class JobFinderAgents:
                 "title": job.get("title", ""),
                 "company": job.get("company", ""),
                 "link": job.get("link", ""),
-                "description": (job.get("description", "") or "")[:300],
+                "description": (job.get("description", "") or "")[:200],
                 "source": job.get("source", ""),
                 "semantic_score": round(job.get("semantic_score", 0.5), 3),
             })

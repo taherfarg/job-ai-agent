@@ -1,9 +1,15 @@
+"""
+linkedin_scraper.py
+───────────────────
+Scrapes job listings from LinkedIn's public job search.
+Falls back to realistic dummy data when blocked.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import logging
-import time
 from urllib.parse import quote_plus
-from config import SCRAPE_LIMIT, SCRAPE_RETRIES
+from scraping.base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -46,73 +52,56 @@ DUMMY_JOBS = [
 ]
 
 
-def search_linkedin_jobs(keyword: str, location: str = "Remote", limit: int = SCRAPE_LIMIT):
-    """
-    Search LinkedIn Jobs with retry/back-off.
-    Falls back to rich dummy data if scraping is blocked.
-    """
-    logger.info(f"Searching LinkedIn for '{keyword}' jobs in '{location}'...")
+class LinkedInScraper(BaseScraper):
+    name = "LinkedIn"
 
-    url = (
-        f"https://www.linkedin.com/jobs/search"
-        f"?keywords={quote_plus(keyword)}&location={quote_plus(location)}&f_WT=2"
-    )
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
-        ),
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
+        url = (
+            f"https://www.linkedin.com/jobs/search"
+            f"?keywords={quote_plus(keyword)}&location={quote_plus(location)}&f_WT=2"
+        )
+        r = requests.get(url, headers=self._headers(), timeout=15)
+        r.raise_for_status()
 
-    for attempt in range(1, SCRAPE_RETRIES + 1):
-        try:
-            r = requests.get(url, headers=headers, timeout=15)
-            r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        job_cards = soup.find_all("div", class_="base-card")
+        if not job_cards:
+            raise ValueError("No job cards found")
 
-            soup = BeautifulSoup(r.text, "html.parser")
-            job_cards = soup.find_all("div", class_="base-card")
+        seen_links = set()
+        jobs = []
+        for card in job_cards[:limit]:
+            try:
+                title_el = card.find("h3", class_="base-search-card__title")
+                title = title_el.text.strip() if title_el else "Unknown"
 
-            if not job_cards:
-                raise ValueError("No job cards found – LinkedIn may have changed layout or blocked request")
+                company_el = card.find("h4", class_="base-search-card__subtitle")
+                company = company_el.text.strip() if company_el else "Unknown"
 
-            seen_links = set()
-            jobs = []
-            for card in job_cards[:limit]:
-                try:
-                    title_elem = card.find("h3", class_="base-search-card__title")
-                    title = title_elem.text.strip() if title_elem else "Unknown"
+                link_el = card.find("a", class_="base-card__full-link")
+                link = link_el["href"].split("?")[0] if link_el else url
 
-                    company_elem = card.find("h4", class_="base-search-card__subtitle")
-                    company = company_elem.text.strip() if company_elem else "Unknown"
-
-                    link_elem = card.find("a", class_="base-card__full-link")
-                    link = link_elem["href"].split("?")[0] if link_elem else url
-
-                    # Deduplicate by link
-                    if link in seen_links:
-                        continue
-                    seen_links.add(link)
-
-                    jobs.append({
-                        "title": title,
-                        "company": company,
-                        "link": link,
-                        "description": f"LinkedIn job: {title} at {company}. See link for full description.",
-                        "source": "LinkedIn",
-                    })
-                except Exception as e:
-                    logger.debug(f"Error parsing LinkedIn job card: {e}")
+                if link in seen_links:
                     continue
+                seen_links.add(link)
 
-            logger.info(f"Found {len(jobs)} jobs from LinkedIn.")
-            return jobs
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "link": link,
+                    "description": f"LinkedIn job: {title} at {company}. See link for full description.",
+                    "source": "LinkedIn",
+                })
+            except Exception as e:
+                logger.debug(f"Error parsing LinkedIn job card: {e}")
+                continue
 
-        except Exception as e:
-            wait = 2 ** attempt
-            logger.warning(f"LinkedIn attempt {attempt}/{SCRAPE_RETRIES} failed: {e}. Retrying in {wait}s...")
-            time.sleep(wait)
+        return jobs
 
-    logger.error("All LinkedIn attempts failed. Returning dummy job data.")
-    return DUMMY_JOBS
+    def _fallback_jobs(self) -> list[dict]:
+        return DUMMY_JOBS
+
+
+# ── Legacy function for backwards compatibility ────────────────────────────
+def search_linkedin_jobs(keyword: str, location: str = "Remote", limit: int = 15) -> list[dict]:
+    return LinkedInScraper().search(keyword, location, limit)

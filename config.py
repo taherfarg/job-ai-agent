@@ -32,6 +32,11 @@ MAX_APPLICATIONS_PER_DAY = int(os.getenv("MAX_APPLICATIONS_PER_DAY", "20"))
 SCRAPE_LIMIT = int(os.getenv("SCRAPE_LIMIT", "15"))
 SCRAPE_RETRIES = int(os.getenv("SCRAPE_RETRIES", "3"))
 
+# Enabled Scrapers (comma-separated list, or empty for all)
+# Options: Indeed, LinkedIn, HackerNews, Glassdoor, GulfTalent, Bayt, NaukriGulf
+_raw_scrapers = os.getenv("ENABLED_SCRAPERS", "")
+ENABLED_SCRAPERS = [s.strip() for s in _raw_scrapers.split(",") if s.strip()] if _raw_scrapers else []
+
 # Applicant Contact Info (used by Playwright automation)
 APPLICANT_EMAIL = os.getenv("APPLICANT_EMAIL", "taherfarg50@gmail.com")
 APPLICANT_PHONE = os.getenv("APPLICANT_PHONE", "+971547224740")

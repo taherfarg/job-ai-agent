@@ -6,11 +6,9 @@ os.environ.setdefault("OPENAI_API_KEY", "NA")
 from utils.cv_parser import load_cv
 from vector_db.build_index import build_vector_index
 from vector_db.search_index import score_jobs_against_cv
-from scraping.indeed_scraper import search_indeed_jobs
-from scraping.linkedin_scraper import search_linkedin_jobs
-from scraping.hn_scraper import search_hn_jobs
+from scraping import scrape_all
 from agents.crew_workflow import run_job_search_crew
-from config import JOB_KEYWORD, JOB_LOCATION, SCRAPE_LIMIT
+from config import JOB_KEYWORD, JOB_LOCATION, SCRAPE_LIMIT, ENABLED_SCRAPERS
 
 # Configure logging
 logging.basicConfig(
@@ -24,6 +22,11 @@ def run_agent():
     logger.info("Starting Job AI Agent workflow...")
     logger.info(f"Searching for: '{JOB_KEYWORD}' in '{JOB_LOCATION}' (limit: {SCRAPE_LIMIT})")
 
+    if ENABLED_SCRAPERS:
+        logger.info(f"Enabled scrapers: {', '.join(ENABLED_SCRAPERS)}")
+    else:
+        logger.info("All scrapers enabled.")
+
     # ── Step 1: Load CV ──────────────────────────────────────────────────────────
     cv_text = load_cv()
     if not cv_text:
@@ -34,14 +37,23 @@ def run_agent():
     build_vector_index(cv_text)
 
     # ── Step 3: Scrape Jobs from All Sources ─────────────────────────────────────
-    logger.info("Scraping jobs from Indeed, LinkedIn, and Hacker News...")
-    indeed_jobs = search_indeed_jobs(JOB_KEYWORD, JOB_LOCATION, SCRAPE_LIMIT)
-    linkedin_jobs = search_linkedin_jobs(JOB_KEYWORD, JOB_LOCATION, SCRAPE_LIMIT)
-    hn_jobs = search_hn_jobs(JOB_KEYWORD, SCRAPE_LIMIT)
+    logger.info("Scraping jobs from all enabled platforms...")
+    all_jobs = scrape_all(
+        keyword=JOB_KEYWORD,
+        location=JOB_LOCATION,
+        limit=SCRAPE_LIMIT,
+        enabled=ENABLED_SCRAPERS if ENABLED_SCRAPERS else None,
+    )
 
-    all_jobs = indeed_jobs + linkedin_jobs + hn_jobs
-    logger.info(f"Total raw jobs fetched: {len(all_jobs)} "
-                f"(Indeed: {len(indeed_jobs)}, LinkedIn: {len(linkedin_jobs)}, HN: {len(hn_jobs)})")
+    # Log source breakdown
+    by_source: dict[str, int] = {}
+    for job in all_jobs:
+        src = job.get("source", "Unknown")
+        by_source[src] = by_source.get(src, 0) + 1
+
+    logger.info(f"Total raw jobs fetched: {len(all_jobs)}")
+    for src, count in by_source.items():
+        logger.info(f"  ├─ {src}: {count}")
 
     if not all_jobs:
         logger.error("No jobs found from any source. Aborting.")

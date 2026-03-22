@@ -1,7 +1,7 @@
 """
 tests/test_scrapers.py
 ──────────────────────
-Unit tests for the three scraper modules.
+Unit tests for all seven scraper modules.
 All tests use the fallback dummy data path so no real network is needed.
 """
 import sys
@@ -35,13 +35,12 @@ class TestIndeedScraper:
             missing = REQUIRED_KEYS - job.keys()
             assert not missing, f"Job missing keys: {missing} — {job}"
 
-    def test_limit_respected(self):
-        """Limit parameter is respected (fallback list is always ≤ limit)."""
+    def test_source_is_indeed(self):
         with patch("scraping.indeed_scraper.requests.get", side_effect=ConnectionError("blocked")):
             from scraping.indeed_scraper import search_indeed_jobs
-            jobs = search_indeed_jobs("AI Engineer", "Remote", limit=2)
-        # fallback may have more than limit since it's pre-defined, but shouldn't be huge
-        assert len(jobs) <= 10
+            jobs = search_indeed_jobs("AI Engineer", "Remote")
+        for job in jobs:
+            assert job["source"] == "Indeed"
 
 
 # ─── LinkedIn ─────────────────────────────────────────────────────────────────
@@ -79,7 +78,6 @@ class TestHNScraper:
             from scraping.hn_scraper import search_hn_jobs
             jobs = search_hn_jobs("AI Engineer")
         assert isinstance(jobs, list)
-        # Empty list is acceptable when API is unavailable
 
     def test_job_dict_has_required_keys_when_successful(self):
         """When API returns mock data, all required keys must be present."""
@@ -105,7 +103,127 @@ class TestHNScraper:
             from scraping.hn_scraper import search_hn_jobs
             jobs = search_hn_jobs("AI Engineer")
 
-        if jobs:  # only check if we got results
+        if jobs:
             for job in jobs:
                 missing = REQUIRED_KEYS - job.keys()
                 assert not missing, f"HN job missing keys: {missing}"
+
+
+# ─── Glassdoor ───────────────────────────────────────────────────────────────
+
+class TestGlassdoorScraper:
+    def test_returns_list_on_network_failure(self):
+        with patch("scraping.glassdoor_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.glassdoor_scraper import GlassdoorScraper
+            jobs = GlassdoorScraper().search("AI Engineer", "UAE")
+        assert isinstance(jobs, list)
+        assert len(jobs) > 0
+
+    def test_job_dict_has_required_keys(self):
+        with patch("scraping.glassdoor_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.glassdoor_scraper import GlassdoorScraper
+            jobs = GlassdoorScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            missing = REQUIRED_KEYS - job.keys()
+            assert not missing, f"Glassdoor job missing keys: {missing} — {job}"
+
+    def test_source_is_glassdoor(self):
+        with patch("scraping.glassdoor_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.glassdoor_scraper import GlassdoorScraper
+            jobs = GlassdoorScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            assert job["source"] == "Glassdoor"
+
+
+# ─── GulfTalent ──────────────────────────────────────────────────────────────
+
+class TestGulfTalentScraper:
+    def test_returns_list_on_network_failure(self):
+        with patch("scraping.gulftalent_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.gulftalent_scraper import GulfTalentScraper
+            jobs = GulfTalentScraper().search("AI Engineer", "UAE")
+        assert isinstance(jobs, list)
+        assert len(jobs) > 0
+
+    def test_job_dict_has_required_keys(self):
+        with patch("scraping.gulftalent_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.gulftalent_scraper import GulfTalentScraper
+            jobs = GulfTalentScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            missing = REQUIRED_KEYS - job.keys()
+            assert not missing, f"GulfTalent job missing keys: {missing} — {job}"
+
+    def test_source_is_gulftalent(self):
+        with patch("scraping.gulftalent_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.gulftalent_scraper import GulfTalentScraper
+            jobs = GulfTalentScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            assert job["source"] == "GulfTalent"
+
+
+# ─── Bayt ────────────────────────────────────────────────────────────────────
+
+class TestBaytScraper:
+    def test_returns_list_on_network_failure(self):
+        with patch("scraping.bayt_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.bayt_scraper import BaytScraper
+            jobs = BaytScraper().search("AI Engineer", "UAE")
+        assert isinstance(jobs, list)
+        assert len(jobs) > 0
+
+    def test_job_dict_has_required_keys(self):
+        with patch("scraping.bayt_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.bayt_scraper import BaytScraper
+            jobs = BaytScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            missing = REQUIRED_KEYS - job.keys()
+            assert not missing, f"Bayt job missing keys: {missing} — {job}"
+
+    def test_source_is_bayt(self):
+        with patch("scraping.bayt_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.bayt_scraper import BaytScraper
+            jobs = BaytScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            assert job["source"] == "Bayt"
+
+
+# ─── NaukriGulf ──────────────────────────────────────────────────────────────
+
+class TestNaukrigulfScraper:
+    def test_returns_list_on_network_failure(self):
+        with patch("scraping.naukrigulf_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.naukrigulf_scraper import NaukrigulfScraper
+            jobs = NaukrigulfScraper().search("AI Engineer", "UAE")
+        assert isinstance(jobs, list)
+        assert len(jobs) > 0
+
+    def test_job_dict_has_required_keys(self):
+        with patch("scraping.naukrigulf_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.naukrigulf_scraper import NaukrigulfScraper
+            jobs = NaukrigulfScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            missing = REQUIRED_KEYS - job.keys()
+            assert not missing, f"NaukriGulf job missing keys: {missing} — {job}"
+
+    def test_source_is_naukrigulf(self):
+        with patch("scraping.naukrigulf_scraper.requests.get", side_effect=ConnectionError("blocked")):
+            from scraping.naukrigulf_scraper import NaukrigulfScraper
+            jobs = NaukrigulfScraper().search("AI Engineer", "UAE")
+        for job in jobs:
+            assert job["source"] == "NaukriGulf"
+
+
+# ─── Registry ────────────────────────────────────────────────────────────────
+
+class TestScraperRegistry:
+    def test_get_all_scrapers_returns_seven(self):
+        from scraping import get_all_scrapers
+        scrapers = get_all_scrapers()
+        assert len(scrapers) == 7
+
+    def test_get_filtered_scrapers(self):
+        from scraping import get_all_scrapers
+        scrapers = get_all_scrapers(enabled=["Indeed", "LinkedIn"])
+        assert len(scrapers) == 2
+        names = {s.name for s in scrapers}
+        assert names == {"Indeed", "LinkedIn"}

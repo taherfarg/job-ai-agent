@@ -103,7 +103,12 @@ def run_job_search_crew(cv_text: str, jobs_found: list[dict]):
     analyzer_agent = analyzer_mod.create_analyzer_agent()
     applier_agent = applier_mod.create_apply_agent()
 
-    search_task = finder_mod.create_search_task(finder_agent, JOB_KEYWORD, JOB_LOCATION, jobs_found)
+    # Pre-filter to top 25 jobs by semantic score to keep prompts within LLM context limits
+    MAX_JOBS_FOR_CREW = 25
+    top_jobs = sorted(jobs_found, key=lambda j: j.get("semantic_score", 0), reverse=True)[:MAX_JOBS_FOR_CREW]
+    logger.info(f"Sending top {len(top_jobs)}/{len(jobs_found)} jobs to CrewAI (filtered by semantic score).")
+
+    search_task = finder_mod.create_search_task(finder_agent, JOB_KEYWORD, JOB_LOCATION, top_jobs)
     analysis_task = analyzer_mod.create_analysis_task(analyzer_agent, cv_text)
     apply_task = applier_mod.create_apply_task(applier_agent, MAX_APPLICATIONS_PER_DAY)
 
