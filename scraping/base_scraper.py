@@ -2,7 +2,8 @@
 base_scraper.py
 ───────────────
 Abstract base class for all job scrapers.
-Provides shared retry/backoff logic, common headers, and schema enforcement.
+Provides shared retry/backoff logic, common headers, schema enforcement,
+and a Playwright-based HTML fallback for sites that block standard requests.
 """
 
 import logging
@@ -41,7 +42,7 @@ class BaseScraper(ABC):
     def search(self, keyword: str, location: str = "", limit: int | None = None) -> list[dict]:
         """
         Search for jobs with automatic retry/backoff.
-        Falls back to dummy data if all attempts fail.
+        Returns an empty list if all attempts fail (no more dummy data).
         """
         limit = limit or self.default_limit
         logger.info(f"[{self.name}] Searching for '{keyword}' in '{location}' (limit={limit})...")
@@ -62,8 +63,19 @@ class BaseScraper(ABC):
                 )
                 time.sleep(wait)
 
-        logger.error(f"[{self.name}] All attempts failed. Returning fallback data.")
-        return self._fallback_jobs()
+        # ── All standard attempts failed – try Playwright as last resort ──
+        logger.info(f"[{self.name}] Standard scraping failed. Trying Playwright browser fallback...")
+        try:
+            jobs = self._scrape_with_playwright(keyword, location, limit)
+            if jobs:
+                self._validate(jobs)
+                logger.info(f"[{self.name}] Playwright fallback found {len(jobs)} jobs.")
+                return jobs
+        except Exception as e:
+            logger.warning(f"[{self.name}] Playwright fallback also failed: {e}")
+
+        logger.error(f"[{self.name}] All attempts failed. Returning empty list (no dummy data).")
+        return []
 
     # ── Subclass hooks ───────────────────────────────────────────────────
     @abstractmethod
@@ -71,10 +83,62 @@ class BaseScraper(ABC):
         """Implement the actual scraping logic. Return list of job dicts."""
         ...
 
-    @abstractmethod
-    def _fallback_jobs(self) -> list[dict]:
-        """Return hard-coded dummy jobs so the pipeline never breaks."""
-        ...
+    def _build_search_url(self, keyword: str, location: str) -> str:
+        """Override in subclasses to return the search URL for Playwright fallback."""
+        return ""
+
+    def _parse_playwright_html(self, html: str, url: str, limit: int) -> list[dict]:
+        """
+        Override in subclasses to parse the HTML returned by Playwright.
+        Defaults to calling _scrape_from_soup if the subclass implements it.
+        """
+        return []
+
+    # ── Playwright fallback ──────────────────────────────────────────────
+    def _scrape_with_playwright(self, keyword: str, location: str, limit: int) -> list[dict]:
+        """
+        Use a real headless Chromium browser via Playwright to load the page.
+        This bypasses Cloudflare, 403 blocks, and JS-rendered content.
+        """
+        url = self._build_search_url(keyword, location)
+        if not url:
+            return []
+
+        html = self._get_html_playwright(url)
+        if not html:
+            return []
+
+        return self._parse_playwright_html(html, url, limit)
+
+    def _get_html_playwright(self, url: str, wait_ms: int = 5000) -> str:
+        """
+        Launch a headless Chromium browser to fetch the full rendered HTML.
+        Returns the page HTML as a string, or empty string on failure.
+        """
+        try:
+            from playwright.sync_api import sync_playwright
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    user_agent=DEFAULT_HEADERS["User-Agent"],
+                    viewport={"width": 1280, "height": 800},
+                )
+                page = context.new_page()
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(wait_ms)  # Let JS render
+
+                # Scroll down to trigger lazy loading
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                page.wait_for_timeout(2000)
+
+                html = page.content()
+                browser.close()
+                return html
+
+        except Exception as e:
+            logger.error(f"[{self.name}] Playwright HTML extraction failed: {e}")
+            return ""
 
     # ── Helpers ──────────────────────────────────────────────────────────
     def _validate(self, jobs: list[dict]):

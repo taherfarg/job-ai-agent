@@ -2,7 +2,7 @@
 gulftalent_scraper.py
 ─────────────────────
 Scrapes job listings from GulfTalent.com — a top Gulf region job board.
-Falls back to realistic dummy data when scraping fails.
+Uses Playwright fallback when standard requests are blocked.
 """
 
 import requests
@@ -13,53 +13,27 @@ from scraping.base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-DUMMY_JOBS = [
-    {
-        "title": "AI Engineer",
-        "company": "Accenture Middle East",
-        "link": "https://www.gulftalent.com/jobs/ai-engineer-accenture-123456",
-        "description": "Accenture ME is hiring an AI Engineer for their Abu Dhabi office. Work on NLP and generative AI solutions for government clients. Python, LangChain, Azure AI.",
-        "source": "GulfTalent",
-    },
-    {
-        "title": "Machine Learning Specialist",
-        "company": "ADNOC Digital",
-        "link": "https://www.gulftalent.com/jobs/ml-specialist-adnoc-789012",
-        "description": "ADNOC Digital is looking for a Machine Learning Specialist to optimize oil & gas operations using predictive analytics. TensorFlow, PySpark, Azure Databricks.",
-        "source": "GulfTalent",
-    },
-    {
-        "title": "Senior Data Scientist",
-        "company": "First Abu Dhabi Bank",
-        "link": "https://www.gulftalent.com/jobs/data-scientist-fab-345678",
-        "description": "FAB is seeking a Sr. Data Scientist to lead credit risk modeling and customer analytics. SAS, Python, SQL, and banking domain knowledge required.",
-        "source": "GulfTalent",
-    },
-    {
-        "title": "AI/ML Lead",
-        "company": "Dubai Holding",
-        "link": "https://www.gulftalent.com/jobs/ai-ml-lead-dh-901234",
-        "description": "Dubai Holding needs an AI/ML Lead to drive AI strategy across hospitality and real estate verticals. People management and cloud ML experience essential.",
-        "source": "GulfTalent",
-    },
-]
-
 
 class GulfTalentScraper(BaseScraper):
     name = "GulfTalent"
 
-    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
-        # GulfTalent search URL pattern
-        url = f"https://www.gulftalent.com/jobs/search?keyword={quote_plus(keyword)}&country={quote_plus(location)}"
+    def _build_search_url(self, keyword: str, location: str) -> str:
+        return f"https://www.gulftalent.com/jobs/search?keyword={quote_plus(keyword)}&country={quote_plus(location)}"
 
+    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
+        url = self._build_search_url(keyword, location)
         r = requests.get(url, headers=self._headers({
             "Referer": "https://www.gulftalent.com/",
         }), timeout=15)
         r.raise_for_status()
+        return self._parse_html(r.text, url, limit)
 
-        soup = BeautifulSoup(r.text, "html.parser")
+    def _parse_playwright_html(self, html: str, url: str, limit: int) -> list[dict]:
+        return self._parse_html(html, url, limit)
 
-        # GulfTalent uses various card/list structures
+    def _parse_html(self, html: str, url: str, limit: int) -> list[dict]:
+        soup = BeautifulSoup(html, "html.parser")
+
         job_cards = (
             soup.select("div.job-listing")
             or soup.select("div.search-result")
@@ -67,6 +41,7 @@ class GulfTalentScraper(BaseScraper):
             or soup.select('[class*="job-card"]')
             or soup.select("tr.job-row")
             or soup.select("div.listing")
+            or soup.select('[class*="vacancy"]')
         )
 
         if not job_cards:
@@ -80,6 +55,7 @@ class GulfTalentScraper(BaseScraper):
                     or card.select_one("h3 a")
                     or card.select_one("a.job-title")
                     or card.select_one('[class*="title"] a')
+                    or card.select_one("a")
                 )
                 title = title_el.text.strip() if title_el else "Unknown Title"
 
@@ -117,6 +93,3 @@ class GulfTalentScraper(BaseScraper):
                 continue
 
         return jobs
-
-    def _fallback_jobs(self) -> list[dict]:
-        return DUMMY_JOBS

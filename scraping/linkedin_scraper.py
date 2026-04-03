@@ -2,7 +2,7 @@
 linkedin_scraper.py
 ───────────────────
 Scrapes job listings from LinkedIn's public job search.
-Falls back to realistic dummy data when blocked.
+Uses Playwright fallback when standard requests are blocked.
 """
 
 import requests
@@ -13,60 +13,30 @@ from scraping.base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-DUMMY_JOBS = [
-    {
-        "title": "AI/ML Engineer",
-        "company": "Sectech Solutions",
-        "link": "https://www.linkedin.com/jobs/view/ai-ml-engineer-at-sectech-solutions-4382452328",
-        "description": "Seeking an AI/ML Engineer proficient in Python, PyTorch, and cloud ML platforms. Experience with LLMOps and MLflow preferred.",
-        "source": "LinkedIn",
-    },
-    {
-        "title": "AI Engineer (Python, Gen AI)",
-        "company": "DHL",
-        "link": "https://my.linkedin.com/jobs/view/ai-engineer-python-gen-ai-at-dhl-4372372365",
-        "description": "DHL is hiring an AI Engineer with GenAI experience (LangChain, OpenAI API). Responsible for building intelligent automation pipelines.",
-        "source": "LinkedIn",
-    },
-    {
-        "title": "Artificial Intelligence Engineer",
-        "company": "Deloitte",
-        "link": "https://uk.linkedin.com/jobs/view/artificial-intelligence-engineer-at-deloitte-4362274740",
-        "description": "Deloitte seeks AI Engineers to design and deploy ML solutions for enterprise clients. Python, TensorFlow, and cloud experience required.",
-        "source": "LinkedIn",
-    },
-    {
-        "title": "Python AI/ML Developer",
-        "company": "Infosys",
-        "link": "https://in.linkedin.com/jobs/view/python-ai-ml-developer-at-infosys-4374018219",
-        "description": "Infosys looking for AI/ML Developer with strong Python background, experience in NLP, computer vision, and REST API development.",
-        "source": "LinkedIn",
-    },
-    {
-        "title": "AI / ML Engineer",
-        "company": "MokshaaLLC",
-        "link": "https://www.linkedin.com/jobs/view/ai-ml-engineer-at-mokshaallc-4382454904",
-        "description": "Remote position for AI/ML Engineer with 3+ years of experience. Must have expertise in Python, Scikit-learn, and model deployment.",
-        "source": "LinkedIn",
-    },
-]
-
 
 class LinkedInScraper(BaseScraper):
     name = "LinkedIn"
 
-    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
-        url = (
+    def _build_search_url(self, keyword: str, location: str) -> str:
+        return (
             f"https://www.linkedin.com/jobs/search"
-            f"?keywords={quote_plus(keyword)}&location={quote_plus(location)}&f_WT=2"
+            f"?keywords={quote_plus(keyword)}&location={quote_plus(location)}&f_WT=2&f_AL=true"
         )
+
+    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
+        url = self._build_search_url(keyword, location)
         r = requests.get(url, headers=self._headers(), timeout=15)
         r.raise_for_status()
+        return self._parse_html(r.text, url, limit)
 
-        soup = BeautifulSoup(r.text, "html.parser")
+    def _parse_playwright_html(self, html: str, url: str, limit: int) -> list[dict]:
+        return self._parse_html(html, url, limit)
+
+    def _parse_html(self, html: str, url: str, limit: int) -> list[dict]:
+        soup = BeautifulSoup(html, "html.parser")
         job_cards = soup.find_all("div", class_="base-card")
         if not job_cards:
-            raise ValueError("No job cards found")
+            raise ValueError("No LinkedIn job cards found")
 
         seen_links = set()
         jobs = []
@@ -97,9 +67,6 @@ class LinkedInScraper(BaseScraper):
                 continue
 
         return jobs
-
-    def _fallback_jobs(self) -> list[dict]:
-        return DUMMY_JOBS
 
 
 # ── Legacy function for backwards compatibility ────────────────────────────

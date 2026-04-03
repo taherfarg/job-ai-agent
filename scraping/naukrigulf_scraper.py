@@ -2,7 +2,7 @@
 naukrigulf_scraper.py
 ─────────────────────
 Scrapes job listings from NaukriGulf.com — popular Gulf region job portal.
-Falls back to realistic dummy data when scraping fails.
+Uses Playwright fallback when standard requests are blocked.
 """
 
 import requests
@@ -13,53 +13,29 @@ from scraping.base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-DUMMY_JOBS = [
-    {
-        "title": "AI/ML Engineer",
-        "company": "Presight AI",
-        "link": "https://www.naukrigulf.com/ai-ml-engineer-jobs-in-abu-dhabi-123456",
-        "description": "Presight AI is looking for an AI/ML Engineer to work on large-scale data analytics and AI solutions for the government sector. Python, Spark, Deep Learning.",
-        "source": "NaukriGulf",
-    },
-    {
-        "title": "Computer Vision Engineer",
-        "company": "Technology Innovation Institute",
-        "link": "https://www.naukrigulf.com/cv-engineer-jobs-in-abu-dhabi-789012",
-        "description": "TII seeks a Computer Vision Engineer to work on autonomous systems. OpenCV, PyTorch, CUDA, and real-time inference experience required.",
-        "source": "NaukriGulf",
-    },
-    {
-        "title": "AI Solutions Architect",
-        "company": "Injazat",
-        "link": "https://www.naukrigulf.com/ai-architect-jobs-in-uae-345678",
-        "description": "Injazat is hiring an AI Solutions Architect for end-to-end ML platform design. Azure ML, MLOps, CI/CD for models. Enterprise solution design experience needed.",
-        "source": "NaukriGulf",
-    },
-    {
-        "title": "Python Developer – AI Platform",
-        "company": "Mashreq Bank",
-        "link": "https://www.naukrigulf.com/python-ai-developer-jobs-in-dubai-901234",
-        "description": "Mashreq Bank seeks a Python Developer to build their AI platform. FastAPI, Docker, Kubernetes, and AI model serving (TensorRT, Triton) skills preferred.",
-        "source": "NaukriGulf",
-    },
-]
-
 
 class NaukrigulfScraper(BaseScraper):
     name = "NaukriGulf"
 
-    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
-        url = (
+    def _build_search_url(self, keyword: str, location: str) -> str:
+        return (
             f"https://www.naukrigulf.com/search"
             f"?keyword={quote_plus(keyword)}&location={quote_plus(location)}"
         )
 
+    def _scrape(self, keyword: str, location: str, limit: int) -> list[dict]:
+        url = self._build_search_url(keyword, location)
         r = requests.get(url, headers=self._headers({
             "Referer": "https://www.naukrigulf.com/",
         }), timeout=15)
         r.raise_for_status()
+        return self._parse_html(r.text, url, limit)
 
-        soup = BeautifulSoup(r.text, "html.parser")
+    def _parse_playwright_html(self, html: str, url: str, limit: int) -> list[dict]:
+        return self._parse_html(html, url, limit)
+
+    def _parse_html(self, html: str, url: str, limit: int) -> list[dict]:
+        soup = BeautifulSoup(html, "html.parser")
 
         job_cards = (
             soup.select("div.srp-listing")
@@ -67,6 +43,7 @@ class NaukrigulfScraper(BaseScraper):
             or soup.select("article.jobTuple")
             or soup.select("div.list-item")
             or soup.select('[class*="listing"]')
+            or soup.select('[class*="jobCard"]')
         )
 
         if not job_cards:
@@ -80,6 +57,7 @@ class NaukrigulfScraper(BaseScraper):
                     or card.select_one("a[class*='title']")
                     or card.select_one("h2 a")
                     or card.select_one("a.job-title")
+                    or card.select_one("a")
                 )
                 title = title_el.text.strip() if title_el else "Unknown Title"
 
@@ -117,6 +95,3 @@ class NaukrigulfScraper(BaseScraper):
                 continue
 
         return jobs
-
-    def _fallback_jobs(self) -> list[dict]:
-        return DUMMY_JOBS
